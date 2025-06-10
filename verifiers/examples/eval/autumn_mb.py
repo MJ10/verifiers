@@ -1,0 +1,93 @@
+import os
+from openai import OpenAI
+
+import verifiers as vf
+from verifiers.envs.autumn_env import AutumnEnv
+from verifiers.rubrics import ModelBasedRubric
+
+def get_environment_ids(base_dir: str):
+    """
+    Get list of environment names based on the `programs` folder, considering all the sexp files.
+    """
+    environment_ids = []
+    for file in os.listdir(f"{base_dir}"):
+        if file.endswith(".sexp"):
+            environment_ids.append(file.split(".")[0])
+    return environment_ids
+
+
+def main(api: str, num_samples: int, max_tokens: int, save_dataset: bool = False,
+         data_dir: str = "data/", programs_dir: str = "programs/", seed: int = 0, std_lib_path: str = "autumn_stdlib.sexp"):
+    # collect V3/R1 rollouts from API
+    if api == "deepseek":
+        base_url = "https://api.deepseek.com"
+        api_key = os.getenv("DEEPSEEK_API_KEY")
+        model_name = "deepseek-chat" # DeepSeek V3-0324
+        client = OpenAI(base_url=base_url, api_key=api_key)
+    elif api == "openai":
+        # just for testing :) not for distillation :)
+        api_key = os.getenv("OPENAI_API_KEY")
+        model_name = "gpt-4.1" 
+        client = OpenAI(api_key=api_key)
+    elif api == "openrouter":
+        api_key = os.getenv("OPENROUTER_API_KEY")
+        model_name = "google/gemini-2.5-flash-preview-05-20"
+        client = OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
+    else:
+        raise ValueError(f"Invalid API: {api}")
+    sampling_args = {
+        "max_tokens": max_tokens,
+    }
+
+    vf_env = AutumnEnv(
+        programs_dir=programs_dir,
+        data_dir=data_dir,
+        train_list=["ice", "grow"],
+        eval_list=["wind"],
+        max_turns=20,
+        seed=seed,
+        std_lib_path=std_lib_path,
+        rubric=ModelBasedRubric(
+            data_dir=data_dir,
+            num_eval_transitions=10,
+            judge_client=client,
+            judge_model=model_name,
+        ),
+    )
+    # columns = ['prompt', 'completion', 'answer', 'reward', ...]
+    # use deepseek-chat for multiturn rollouts (V3-0324)
+    results = vf_env.evaluate(
+        client=client,
+        model=model_name, 
+        sampling_args=sampling_args,
+        num_samples=num_samples
+    )
+
+    print('--- Example ---')
+    print('Prompt: ', results['prompt'][0])
+    print('Completion: ', results['completion'][0])
+    print('Answer: ', results['answer'][0])
+    print("--- Rewards ---")
+    for k, v in results.items():
+        if 'reward' in k:
+            print(k, '-', sum(v) / len(v)) 
+    if save_dataset:
+        dataset_dsv3 = vf_env.make_dataset(results)
+        # filter to top half of rows by rewards
+        dataset_dsv3 = dataset_dsv3.sort("reward", reverse=True).select(range(len(dataset_dsv3) // 2))
+        # save to hub
+        dataset_dsv3.push_to_hub("V3-wordle")
+
+if __name__ == "__main__":
+    import argparse
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument("--api", "-a", type=str, default="openai")
+    argparser.add_argument("--num-samples", "-n", type=int, default=20)
+    argparser.add_argument("--max-tokens", "-t", type=int, default=2048)
+    argparser.add_argument("--save-dataset", "-s", action="store_true", default=False)
+    argparser.add_argument("--data-dir", "-d", type=str, default="data/")
+    argparser.add_argument("--programs-dir", "-p", type=str, default="programs/")
+    argparser.add_argument("--seed", type=int, default=0)
+    argparser.add_argument("--std-lib-path", "-l", type=str, default="autumn_stdlib.sexp")
+    args = argparser.parse_args()
+    main(args.api, args.num_samples, args.max_tokens, args.save_dataset, args.data_dir, args.programs_dir, args.seed, args.std_lib_path)
