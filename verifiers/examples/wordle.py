@@ -14,8 +14,8 @@ training:
 CUDA_VISIBLE_DEVICES=4,5,6,7 accelerate launch --config-file configs/zero3.yaml --num-processes 4 verifiers/examples/wordle.py
 """
 
-size = '7B'
-model_name = f'willcb/Qwen2.5-{size}-Wordle-SFT'
+size = '0.5B'
+model_name = f'Qwen/Qwen2.5-{size}-Instruct'
 model, tokenizer = vf.get_model_and_tokenizer(model_name)
 
 vf_env = TextArenaEnv(

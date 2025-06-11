@@ -32,10 +32,10 @@ vf_env = AutumnEnv(
     max_turns=20,
     seed=args.seed,
     std_lib_path=args.std_lib_path,
-    rubric=vf.ModelBasedRubric(
+    rubric=vf.rubrics.ModelBasedRubric(
         data_dir=args.data_dir,
         num_eval_transitions=10,
-        judge_client=OpenAI(base_url="http://localhost:8000"),
+        judge_client=OpenAI(base_url="http://localhost:8000", api_key="abc"),
         judge_model=model_name,
     ),
 )

@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 from openai import OpenAI
 from typing import Dict, Tuple, Any, List, Union
+from transformers import PreTrainedTokenizerBase
 
 from verifiers import MultiTurnEnv
 from verifiers.parsers import XMLParser
@@ -191,17 +192,17 @@ class AutumnEnv(MultiTurnEnv):
             return state['is_finished']
         return False
 
-    def render(self, render_dict: Dict[str, Any]):
+    def render(self, render_dict: Dict[str, Any], error_msg: str = None):
         if self.render_mode == 'text':
             render_dict = render_grid(render_dict)
             return render_dict
         elif self.render_mode == 'numbers':
             render_dict = render_grid_numbers(render_dict)
             return render_dict
-        elif self.render_mode == "json":
-            return render_dict
-        else:
-            raise ValueError(f"Invalid mode: {self.render_mode}")
+        if error_msg:
+            return error_msg + render_dict
+        return render_dict
+        
 
     def env_response(self,
                      messages: List[Dict[str, Any]],
@@ -212,11 +213,11 @@ class AutumnEnv(MultiTurnEnv):
             env_name = state["env_name"]
             prog = open(f"{self.programs_dir}/{env_name}.sexp", "r").read()
             self.is_terminal = False
-            self.interpreter = interpreter_module.Interpreter()
+            state["interpreter"] = interpreter_module.Interpreter()
             stdlib = open(self.std_lib_path, "r").read()
-            self.interpreter.run_script(prog, stdlib, "", self.seed)
+            state["interpreter"].run_script(prog, stdlib, "", self.seed)
             state['initialized'] = True
-            observation = self.render(self.interpreter.render_all())
+            observation = self.render(state["interpreter"].render_all())
             env_message = {"role": "user", "content": observation}    
             return env_message, state
         
@@ -225,22 +226,25 @@ class AutumnEnv(MultiTurnEnv):
         action = str(turn.action)
         model_edit = turn.model_edit
         think = turn.think
-
+        error_msg = None
         if action == "quit":
             self.is_terminal = True
         if action.startswith("click"):
-            x, y = action.strip().split()[1:]
-            self.interpreter.click(int(x), int(y))
+            try:
+                x, y = action.strip().split()[1:]
+                state["interpreter"].click(int(x), int(y))
+            except Exception as e:
+                error_msg = f"Invalid action: {action}. Error: {e}.\nExecuting NOP instead.\n"
         elif action == "left":
-            self.interpreter.left()
+            state["interpreter"].left()
         elif action == "right":
-            self.interpreter.right()
+            state["interpreter"].right()
         elif action == "up":
-            self.interpreter.up()
+            state["interpreter"].up()
         elif action == "down":
-            self.interpreter.down()
-        self.interpreter.step()
-        observation = self.render(self.interpreter.render_all())
+            state["interpreter"].down()
+        state["interpreter"].step()
+        observation = self.render(state["interpreter"].render_all(), error_msg)
         
         # dmp = diff_match_patch()
         # dmp_patch = dmp.patch_fromText(model_edit)
@@ -262,7 +266,7 @@ class AutumnEnv(MultiTurnEnv):
         Generate a multi-turn rollout with the environment (messages, state).
         """
         is_completed = False
-        import pdb; pdb.set_trace();
+        # import pdb; pdb.set_trace();
         state = {'model': "", 'answer': answer, "env_name": prompt[-1]["content"]}
         messages = [{
             "role": "system",
@@ -292,6 +296,7 @@ class AutumnEnv(MultiTurnEnv):
             turn += 1
             if self.is_completed(messages, state, **kwargs) or turn >= self.max_turns or has_error:
                 is_completed = True
+                state["interpreter"] = None
             
         return completion, state
 
@@ -313,4 +318,74 @@ class AutumnEnv(MultiTurnEnv):
         
         dataset = Dataset.from_list(dataset_rows)
         eval_dataset = Dataset.from_list(eval_dataset_rows)
-        return dataset, eval_dataset
+        return dataset.repeat(100), eval_dataset.repeat(100)
+    
+    def process_chat_format(
+        self,
+        prompt: List[Dict[str, str]],
+        completion: List[Dict[str, str]],
+        processing_class: PreTrainedTokenizerBase,
+        mask_env_responses: bool = False
+    ) -> Tuple[List[int], List[int], List[int], List[int]]:
+        """
+        Process chat format conversations using incremental prefixes.
+        
+        Logic:
+        1. For each step, tokenize conversation prefix (prompt + completion[:i])
+        2. Calculate token differences between steps to get individual message tokens
+        3. Apply masking for intermediate responses if needed
+        
+        Returns:
+            prompt_ids, prompt_mask, completion_ids, completion_mask
+        """
+        # tokenize just the prompt
+        prompt = prompt[:-1] + [completion[0]]
+        completion = completion[1:]
+        prompt_text = processing_class.apply_chat_template(prompt, tokenize=False, add_generation_prompt=True)
+        assert isinstance(prompt_text, str)
+        prompt_ids = processing_class.encode(prompt_text)
+        prompt_mask = [1] * len(prompt_ids)
+        
+        # track completion tokens and masks by processing incrementally
+        completion_ids = []
+        completion_mask = []
+        
+        # previous tokenization (starts with just prompt)
+        prev_ids = prompt_ids
+        
+        # process each completion message incrementally
+        for i, msg in enumerate(completion):
+            # create conversation prefix: prompt + completion[:i+1]
+            conversation_prefix = prompt + completion[:i+1]
+            
+            # tokenize the full prefix
+            prefix_text = processing_class.apply_chat_template(
+                conversation_prefix, 
+                tokenize=False, 
+                add_generation_prompt=False,
+            )
+            assert isinstance(prefix_text, str), f"Expected string from apply_chat_template, got {type(prefix_text)}"
+            current_ids = processing_class.encode(prefix_text)
+            assert current_ids[:len(prev_ids)] == prev_ids, f"Tokenization difference in chat format. Current ids: {current_ids}, previous ids: {prev_ids}"
+            
+            # add new tokens to completion tokens
+            new_tokens = current_ids[len(prev_ids):] 
+            assert len(new_tokens) > 0, f"No new tokens in chat format. Current ids: {current_ids}, previous ids: {prev_ids}"
+            completion_ids.extend(new_tokens)
+
+            # create mask
+            if msg["role"] == "assistant":
+                msg_mask = [1] * len(new_tokens)
+            elif msg["role"] != "assistant" and mask_env_responses:
+                # mask intermediate 'user' and/or 'tool' messages 
+                msg_mask = [0] * len(new_tokens)
+            else:
+                # default to not masking
+                msg_mask = [1] * len(new_tokens)
+            
+            completion_mask.extend(msg_mask)
+            # Update previous tokenization for next iteration
+            prev_ids = current_ids
+            assert len(completion_ids) == len(completion_mask), f"Length mismatch in chat format. Completion ids: {completion_ids}, completion mask: {completion_mask}"
+
+        return prompt_ids, prompt_mask, completion_ids, completion_mask

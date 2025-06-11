@@ -84,7 +84,9 @@ class ModelBasedRubric(Rubric):
         # prompt contains name of the env
         
         model = state['model']
-        transitions = self.load_transitions(prompt)
+        # import pdb; pdb.set_trace();
+        env_name = state['env_name']
+        transitions = self.load_transitions(env_name)
 
         eval_transitions = random.sample(transitions, self.num_eval_transitions)
         scores = []
