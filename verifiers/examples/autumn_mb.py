@@ -1,7 +1,8 @@
 import verifiers as vf
-from verifiers.envs.autumn_env import AutumnEnv
+from verifiers.envs.autumn_env import AutumnEnv, get_environment_ids
 from openai import OpenAI
 import argparse
+import random
 
 """
 inference:
@@ -24,6 +25,25 @@ argparser.add_argument("--seed", type=int, default=0)
 argparser.add_argument("--std-lib-path", type=str, default="autumn_stdlib.sexp")
 args = argparser.parse_args()
 
+run_name = f"autumn-grpo-{args.model_name}"
+training_args=vf.grpo_defaults(run_name=run_name)
+training_args.num_iterations=1
+training_args.per_device_train_batch_size=6
+training_args.num_generations=12
+training_args.gradient_accumulation_steps=4
+training_args.max_prompt_length=8192
+training_args.max_completion_length=2048
+training_args.max_steps=100
+training_args.mask_env_responses=True
+
+model, tokenizer = vf.get_model_and_tokenizer(args.model_name)
+
+env_ids = get_environment_ids(args.programs_dir)
+# randomly split into train and eval
+train_env_ids = random.sample(env_ids, int(len(env_ids) * 0.8))
+eval_env_ids = [env_id for env_id in env_ids if env_id not in train_env_ids]
+
+
 vf_env = AutumnEnv(
     programs_dir=args.programs_dir,
     data_dir=args.data_dir,
@@ -35,22 +55,10 @@ vf_env = AutumnEnv(
     rubric=vf.rubrics.ModelBasedRubric(
         data_dir=args.data_dir,
         num_eval_transitions=10,
-        judge_client=OpenAI(base_url="http://localhost:8000", api_key="abc"),
+        judge_client=OpenAI(base_url=f"http://{args.vllm_server_host}:{args.vllm_server_port}/v1", api_key="abc"),
         judge_model=model_name,
     ),
 )
-run_name = f"autumn-grpo-{args.model_name}"
-training_args=vf.grpo_defaults(run_name=run_name)
-training_args.num_iterations=1
-training_args.per_device_train_batch_size=6
-training_args.num_generations=12
-training_args.gradient_accumulation_steps=4
-training_args.max_prompt_length=1024
-training_args.max_completion_length=4096
-training_args.max_steps=100
-training_args.mask_env_responses=True
-
-model, tokenizer = vf.get_model_and_tokenizer(args.model_name)
 
 trainer = vf.GRPOTrainer(
     model=model,
