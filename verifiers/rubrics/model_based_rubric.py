@@ -56,6 +56,7 @@ class ModelBasedRubric(Rubric):
                  parser: Parser = Parser(),
                  data_dir: str = "data/",
                  num_eval_transitions: int = 10,
+                 disable_rub: bool = False,
                  **kwargs):
         super().__init__(**kwargs)
         self.judge_client = judge_client if judge_client is not None else OpenAI()
@@ -64,7 +65,8 @@ class ModelBasedRubric(Rubric):
         self.parser = parser
         self.data_dir = data_dir
         self.num_eval_transitions = num_eval_transitions
-        self.add_reward_func(self.judge_reward_func)
+        if not disable_rub:
+            self.add_reward_func(self.judge_reward_func)
 
     def load_transitions(self, env_name: str) -> List[Dict]:
         with open(f"{self.data_dir}/{env_name}.json", "r") as f:

@@ -132,6 +132,53 @@ def render_grid_numbers(grid: Dict[str, Any]) -> str:
                 grid_matrix[row_idx][col_idx] = color
     return '\n'.join([' '.join(row) for row in grid_matrix])
 
+SYS_PROMPT_ALT = """You are an AI agent tasked with exploring and understanding a grid-based environment. Your goal is to interact with the environment efficiently and effectively, trying to deduce the underlying rules that govern it. You will be provided with observations from the environment and your current model of understanding. Based on these, you should think, update your model if necessary, and decide on an action to take.
+
+Here is the current observation of the environment:
+<environment_observation>
+{{ENVIRONMENT_OBSERVATION}}
+</environment_observation>
+
+Here is your current model of understanding:
+<current_model>
+{{CURRENT_MODEL}}
+</current_model>
+
+For each turn, follow these steps:
+
+1. Think: Analyze the current observation and your existing model. Consider what you've learned so far and what you still need to explore or confirm. Think about the most effective action to take next. Do this inside <think> tags.
+
+2. Update Model: Based on your thinking, update your model of understanding if necessary. If you're adding new information or modifying existing information, do this inside <model_edit> tags. If no update is needed, you can skip this step.
+
+3. Choose Action: Decide on the next action to take. Your options are:
+   * left: press the left arrow key
+   * right: press the right arrow key
+   * up: press the up arrow key
+   * down: press the down arrow key
+   * click <x> <y>: click on the cell at location (<x>, <y>)
+   * NOP: do nothing
+   * quit: quit the environment
+
+   Place your chosen action inside <action> tags.
+
+Your output should strictly follow this format:
+
+<think>
+[Your step-by-step thinking process]
+</think>
+
+<model_edit>
+[Your updates to the model, if any]
+</model_edit>
+
+<action>
+[Your chosen action]
+</action>
+
+Remember, your final output should only include these three elements: the thinking process, model edits (if any), and the chosen action. Do not include any additional text or explanations outside of these tags.
+"""
+
+
 SYSTEM_PROMPT = """You are a curious agent exploring an environment that consists of a grid containing cells which can take colors. 
 You will be given observations and available actions to choose from at each step. 
 Your task is to interact with the environment efficiently and effectively and try to understand the underlying rules of the environment.
@@ -168,6 +215,8 @@ class AutumnEnv(MultiTurnEnv):
         self.std_lib_path = std_lib_path
         self.render_mode = "json"
         parser = XMLParser(fields=["think", "model_edit" ,"action"], answer_field="action")
+        rubric.add_reward_func(parser.get_format_reward_func(), weight=0.2)
+
         self.dataset, self.eval_dataset = self.autumn_to_hf(train_list, eval_list)
         super().__init__(
             system_prompt=SYSTEM_PROMPT,

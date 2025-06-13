@@ -1,19 +1,10 @@
 import os
 from openai import OpenAI
+import random
 
 import verifiers as vf
-from verifiers.envs.autumn_env import AutumnEnv
+from verifiers.envs.autumn_env import AutumnEnv, get_environment_ids
 from verifiers.rubrics import ModelBasedRubric
-
-def get_environment_ids(base_dir: str):
-    """
-    Get list of environment names based on the `programs` folder, considering all the sexp files.
-    """
-    environment_ids = []
-    for file in os.listdir(f"{base_dir}"):
-        if file.endswith(".sexp"):
-            environment_ids.append(file.split(".")[0])
-    return environment_ids
 
 
 def main(api: str, num_samples: int, max_tokens: int, save_dataset: bool = False,
@@ -41,20 +32,25 @@ def main(api: str, num_samples: int, max_tokens: int, save_dataset: bool = False
     sampling_args = {
         "max_tokens": max_tokens,
     }
+    env_ids = get_environment_ids(programs_dir)
+    # randomly split into train and eval
+    train_env_ids = random.sample(env_ids, int(len(env_ids) * 0.8))
+    eval_env_ids = [env_id for env_id in env_ids if env_id not in train_env_ids]
 
     vf_env = AutumnEnv(
         programs_dir=programs_dir,
         data_dir=data_dir,
-        train_list=["ice", "grow"],
-        eval_list=["wind"],
-        max_turns=20,
+        train_list=train_env_ids,
+        eval_list=eval_env_ids,
+        max_turns=50,
         seed=seed,
         std_lib_path=std_lib_path,
         rubric=ModelBasedRubric(
             data_dir=data_dir,
-            num_eval_transitions=10,
+            num_eval_transitions=20,
             judge_client=client,
             judge_model=model_name,
+            disable_rub=True
         ),
     )
     # columns = ['prompt', 'completion', 'answer', 'reward', ...]
@@ -77,9 +73,9 @@ def main(api: str, num_samples: int, max_tokens: int, save_dataset: bool = False
     if save_dataset:
         dataset_dsv3 = vf_env.make_dataset(results)
         # filter to top half of rows by rewards
-        dataset_dsv3 = dataset_dsv3.sort("reward", reverse=True).select(range(len(dataset_dsv3) // 2))
+        dataset_dsv3 = dataset_dsv3.sort("reward", reverse=True)
         # save to hub
-        dataset_dsv3.push_to_hub("V3-wordle")
+        dataset_dsv3.push_to_hub("V0-autumn")
 
 if __name__ == "__main__":
     import argparse

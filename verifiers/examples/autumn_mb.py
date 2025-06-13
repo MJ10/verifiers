@@ -35,6 +35,7 @@ training_args.max_prompt_length=8192
 training_args.max_completion_length=2048
 training_args.max_steps=100
 training_args.mask_env_responses=True
+training_args.async_generation_timeout=1000
 
 model, tokenizer = vf.get_model_and_tokenizer(args.model_name)
 
