@@ -6,6 +6,7 @@ from .codemath_rubric import CodeMathRubric
 from .tool_rubric import ToolRubric
 from .smola_tool_rubric import SmolaToolRubric
 from .model_based_rubric import ModelBasedRubric
+from .tw_rubric import TextWorldRubric  
 
 __all__ = [
     "Rubric",
@@ -15,5 +16,6 @@ __all__ = [
     "CodeMathRubric",
     "ToolRubric",
     "SmolaToolRubric",
-    "ModelBasedRubric"
+    "ModelBasedRubric",
+    "TextWorldRubric",
 ]
