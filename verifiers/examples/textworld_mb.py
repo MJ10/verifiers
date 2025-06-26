@@ -45,7 +45,7 @@ training_args.async_generation_timeout=1000
 
 model, tokenizer = vf.get_model_and_tokenizer(args.model_name)
 
-TEXTWORLD_PATH = "/Users/jean/Documents/verifiers/verifiers/tw_games"
+TEXTWORLD_PATH = "./verifiers/tw_games"
 tasks = ["the_cooking_game"]
 
 
@@ -69,7 +69,7 @@ def get_environment_ids(textworld_games_path, tasks, max_steps, seed=0):
 
     return env_ids
 
-env_ids = get_environment_ids(TEXTWORLD_PATH, tasks)
+env_ids = get_environment_ids(TEXTWORLD_PATH, tasks, max_steps=10, seed=args.seed)
 # randomly split into train and eval
 train_env_ids = random.sample(env_ids, int(len(env_ids) * 0.8))
 eval_env_ids = [env_id for env_id in env_ids if env_id not in train_env_ids]
@@ -78,8 +78,8 @@ eval_env_ids = [env_id for env_id in env_ids if env_id not in train_env_ids]
 vf_env = TextWorldEnv(
     programs_dir=args.programs_dir,
     data_dir=args.data_dir,
-    train_list=["tw-v16"],
-    eval_list=["tw-v16"],
+    train_list=[env_ids[0]],
+    eval_list=[env_ids[0]],
     max_turns=10,
     seed=args.seed,
     std_lib_path=args.std_lib_path,

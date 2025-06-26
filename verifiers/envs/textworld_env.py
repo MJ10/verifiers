@@ -307,7 +307,7 @@ class TextWorldEnv(MultiTurnEnv):
         
         dataset = Dataset.from_list(dataset_rows)
         eval_dataset = Dataset.from_list(eval_dataset_rows)
-        return dataset.repeat(100), eval_dataset.repeat(100)
+        return dataset, eval_dataset
     
     def process_chat_format(
         self,
