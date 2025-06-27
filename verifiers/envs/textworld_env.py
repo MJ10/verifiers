@@ -437,8 +437,8 @@ class TextWorldWrapper(gym.Wrapper):
         return {"progression": self.progression}
     
     def get_available_actions(self):
-        if self.last_info and "possible_commands" in self.last_info:
-            return self.last_info["possible_commands"]
+        if self.last_info and "admissible_commands" in self.last_info:
+            return self.last_info["admissible_commands"]
         else:
             return []
     def get_max_score(self):
