@@ -117,14 +117,16 @@ class Environment(ABC):
             return messages
         
         if answer_key == "answer":
+            num_proc = 1#min(self.max_concurrent, 32, len(dataset))
             return dataset.map(lambda x: {
                 "prompt": format_prompt_fn(x[question_key]),
-            }, num_proc=min(self.max_concurrent, 32))
+            }, num_proc=num_proc)
         else:
+            num_proc = 1#min(self.max_concurrent, 32, len(dataset))
             return dataset.map(lambda x: {
                 "prompt": format_prompt_fn(x[question_key]),
                 "answer": x[answer_key]
-            }, num_proc=min(self.max_concurrent, 32))
+            }, num_proc=num_proc)
 
     def get_dataset(self, n: int = -1, seed: int = 0, **kwargs: Any) -> Dataset | None:
         if n > 0 and self.dataset is not None:
@@ -270,7 +272,7 @@ class Environment(ABC):
         """
         def setup_executor(loop):
             if loop._default_executor is None:
-                executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_concurrent)
+                executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)#max_concurrent)
                 loop.set_default_executor(executor)
         
         coro = self._run_all(
@@ -537,6 +539,7 @@ class Environment(ABC):
         results = self.generate(
             inputs, client, model, sampling_args, max_concurrent, **kwargs
         )
+        print(results)
         return results
 
     def make_dataset(self,

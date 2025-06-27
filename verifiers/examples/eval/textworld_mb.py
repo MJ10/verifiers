@@ -62,12 +62,14 @@ def main(api: str, num_samples: int, max_tokens: int, save_dataset: bool = False
     }
     # env_ids = get_environment_ids(programs_dir)
     # randomly split into train and eval
-    all_env_ids = get_environment_ids(TEXTWORLD_PATH, tasks, max_steps = 10, seed=seed)
+    all_env_ids = get_environment_ids(TEXTWORLD_PATH, tasks, max_steps = 10, seed=seed)#[:20]
     random.seed(seed)
     random.shuffle(all_env_ids)
-    split_idx = int(0.8 * len(all_env_ids))
+    split_idx = 1#int(len(all_env_ids))
     train_env_ids = all_env_ids[:split_idx]
     eval_env_ids = all_env_ids[split_idx:]
+    print(len(train_env_ids), "train environments")
+    print(len(eval_env_ids), "eval environments")
 
     vf_env = TextWorldEnv(
         programs_dir=programs_dir,

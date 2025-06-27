@@ -95,9 +95,9 @@ Remember, your final output should only include these three elements: the thinki
 """
 
 
-SYSTEM_PROMPT = """You are a curious agent exploring a text-based environment. 
+SYSTEM_PROMPT = """You are a curious agent exploring a text-based game. 
 You will be given observations and available actions to choose from at each step. 
-Your task is to interact with the environment efficiently and effectively and try to understand the underlying rules of the environment.
+Your task is to interact with the environment efficiently and win the game.
 Your understanding of the environment should be captured in the model text. 
 
 In each turn, think step-by-step inside <think>...</think> tags, generate the model in <model_edit>...</model_edit> tags, produce the action inside <action>...</action> tags.
@@ -232,6 +232,7 @@ class TextWorldEnv(MultiTurnEnv):
 
        # import pdb; pdb.set_trace();
         state = {'model': "", 'answer': answer, "env_name": prompt[-1]["content"]}
+        print(state['env_name'])
 
         # initialize env and get list of available actions
         env_msg, state = self.env_response([], state, **kwargs)
@@ -307,7 +308,7 @@ class TextWorldEnv(MultiTurnEnv):
         
         dataset = Dataset.from_list(dataset_rows)
         eval_dataset = Dataset.from_list(eval_dataset_rows)
-        return dataset, eval_dataset
+        return dataset.repeat(1), eval_dataset.repeat(1)
     
     def process_chat_format(
         self,
