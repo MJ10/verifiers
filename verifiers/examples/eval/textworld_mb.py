@@ -10,8 +10,13 @@ import textworld
 import glob
 from pathlib import Path
 
+import pprint
+import json 
+
 TEXTWORLD_PATH = "./tw_games"
 tasks = ["the_cooking_game"]
+
+MAX_STEPS = 40
 
 
 def get_environment_ids(textworld_games_path, tasks, max_steps, seed=0):
@@ -21,7 +26,8 @@ def get_environment_ids(textworld_games_path, tasks, max_steps, seed=0):
         score=True,
         max_score=True,
         won=True,
-        admissible_commands=True
+        admissible_commands=True,
+        possible_commands=True,
     )
 
     env_ids = []
@@ -33,6 +39,31 @@ def get_environment_ids(textworld_games_path, tasks, max_steps, seed=0):
                 env_ids.append(env_id)
 
     return env_ids
+
+def save_dataset_json(results):
+    cols = ['question', 'answer', 'prompt', 'completion', 'reward', 'judge_reward_func', 'format_reward_func']
+
+    # Add 'task' column if present
+    if results['task'][0] is not None:
+        cols.append('task')
+
+    # Build the list of row dicts
+    dataset_rows = []
+    num_rows = len(results['prompt'])  # Assumes all columns are same length
+
+    for i in range(num_rows):
+        row = {col: results[col][i] for col in cols}
+        row['num_turns'] = results['state'][i]['turn']
+        row['max_reward'] = results['state'][i]['max_reward']
+        dataset_rows.append(row)
+
+    # Save to JSON file
+    output_path = f'{args.save_file_name}.json'
+    with open(output_path, 'w') as f:
+        json.dump(dataset_rows, f, indent=2)
+
+    print(f'Saved dataset with {num_rows} rows to {output_path}')
+    return output_path
 
 
 def main(api: str, num_samples: int, max_tokens: int, save_dataset: bool = False,
@@ -62,9 +93,9 @@ def main(api: str, num_samples: int, max_tokens: int, save_dataset: bool = False
     }
     # env_ids = get_environment_ids(programs_dir)
     # randomly split into train and eval
-    all_env_ids = get_environment_ids(TEXTWORLD_PATH, tasks, max_steps = 10, seed=seed)#[:20]
+    all_env_ids = get_environment_ids(TEXTWORLD_PATH, tasks, max_steps = MAX_STEPS, seed=seed)#[:20]
     random.seed(seed)
-    random.shuffle(all_env_ids)
+    #random.shuffle(all_env_ids)
     split_idx = 1#int(len(all_env_ids))
     train_env_ids = all_env_ids[:split_idx]
     eval_env_ids = all_env_ids[split_idx:]
@@ -76,7 +107,7 @@ def main(api: str, num_samples: int, max_tokens: int, save_dataset: bool = False
         data_dir=data_dir,
         train_list=train_env_ids,
         eval_list=eval_env_ids,
-        max_turns = 10,
+        max_turns = MAX_STEPS,
         seed=seed,
         std_lib_path=std_lib_path,
         rubric=TextWorldRubric(),
@@ -90,11 +121,15 @@ def main(api: str, num_samples: int, max_tokens: int, save_dataset: bool = False
         sampling_args=sampling_args,
         num_samples=num_samples
     )
+    save_dataset_json(results)
 
     print('--- Example ---')
-    print('Prompt: ', results['prompt'][0])
-    print('Completion: ', results['completion'][0])
-    print('Answer: ', results['answer'][0])
+    print('Prompt:')
+    pprint.pprint(results['prompt'][0])
+    print('Completion:')
+    pprint.pprint(results['completion'][0])
+    print('Answer:')
+    pprint.pprint(results['answer'][0])
     print("--- Rewards ---")
     for k, v in results.items():
         if 'reward' in k:
@@ -117,5 +152,6 @@ if __name__ == "__main__":
     argparser.add_argument("--programs-dir", "-p", type=str, default="programs/")
     argparser.add_argument("--seed", type=int, default=0)
     argparser.add_argument("--std-lib-path", "-l", type=str, default="autumn_stdlib.sexp")
+    argparser.add_argument("-save_file_name", "-sn", type=str, default="textworld_eval_results")
     args = argparser.parse_args()
     main(args.api, args.num_samples, args.max_tokens, args.save_dataset, args.data_dir, args.programs_dir, args.seed, args.std_lib_path)

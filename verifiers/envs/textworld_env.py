@@ -95,9 +95,9 @@ Remember, your final output should only include these three elements: the thinki
 """
 
 
-SYSTEM_PROMPT = """You are a curious agent exploring a text-based game. 
+SYSTEM_PROMPT = """You are an expert agent playing a text-based game. 
 You will be given observations and available actions to choose from at each step. 
-Your task is to interact with the environment efficiently and win the game.
+Your task is to interact with the environment efficiently to collect as many points as possible and win the game.
 Your understanding of the environment should be captured in the model text. 
 
 In each turn, think step-by-step inside <think>...</think> tags, generate the model in <model_edit>...</model_edit> tags, produce the action inside <action>...</action> tags.
@@ -111,7 +111,7 @@ class TextWorldEnv(MultiTurnEnv):
     def __init__(self,
                  programs_dir: str = "n/a",
                  seed: int = 0,
-                 max_turns: int = 10,
+                 max_turns: int = 40,
                  rubric: ModelBasedRubric = None,
                  std_lib_path: str = "n/a",
                  train_list: List[str] = [],
@@ -169,6 +169,8 @@ class TextWorldEnv(MultiTurnEnv):
 
             state['reward'] = 0.0
 
+            state['max_reward'] = state['env'].get_max_score()
+
             available_actions = state['env'].get_available_actions()
 
             state['available_actions'] = available_actions
@@ -199,7 +201,7 @@ class TextWorldEnv(MultiTurnEnv):
             error_msg = "Invalid action: executing 'help' instead."
 
         obsv, reward, done, info = state['env'].step(action)
-        state['reward'] += reward 
+        state['reward'] = reward 
         self.is_terminal = done 
 
         state['model'] = model_edit
@@ -287,7 +289,7 @@ class TextWorldEnv(MultiTurnEnv):
             turn += 1
             if self.is_completed(messages, state, **kwargs) or turn >= self.max_turns or has_error:
                 is_completed = True
-            
+        state['turn'] = turn
         return completion, state
 
     def textworld_to_hf(self, train_list, eval_list) -> Tuple[Dataset, Dataset]:
@@ -435,7 +437,12 @@ class TextWorldWrapper(gym.Wrapper):
         return {"progression": self.progression}
     
     def get_available_actions(self):
-        if self.last_info and "admissible_commands" in self.last_info:
-            return self.last_info["admissible_commands"]
+        if self.last_info and "possible_commands" in self.last_info:
+            return self.last_info["possible_commands"]
         else:
             return []
+    def get_max_score(self):
+        if self.last_info and "max_score" in self.last_info:
+            return self.last_info["max_score"]
+        else:
+            return 0.0

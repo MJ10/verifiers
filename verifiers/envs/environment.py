@@ -538,8 +538,9 @@ class Environment(ABC):
 
         results = self.generate(
             inputs, client, model, sampling_args, max_concurrent, **kwargs
+
         )
-        print(results)
+        # print(results)
         return results
 
     def make_dataset(self,
