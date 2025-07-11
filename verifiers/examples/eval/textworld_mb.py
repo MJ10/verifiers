@@ -84,7 +84,7 @@ def main(api: str, num_samples: int, max_tokens: int, save_dataset: bool = False
         model_name = "google/gemini-2.5-flash-preview-05-20"
         client = OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
     elif api == "local":
-        model_name = "Qwen/Qwen2.5-7B-Instruct"
+        model_name = "Qwen/Qwen2.5-0.5B-Instruct"
         client = OpenAI(api_key="abc", base_url="http://localhost:8000/v1")
     else:
         raise ValueError(f"Invalid API: {api}")
