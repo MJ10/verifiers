@@ -78,8 +78,8 @@ eval_env_ids = [env_id for env_id in env_ids if env_id not in train_env_ids]
 vf_env = TextWorldEnv(
     programs_dir=args.programs_dir,
     data_dir=args.data_dir,
-    train_list=[env_ids[0]],
-    eval_list=[env_ids[0]],
+    train_list=train_env_ids,
+    eval_list=eval_env_ids,
     max_turns=10,
     seed=args.seed,
     std_lib_path=args.std_lib_path,
@@ -94,4 +94,3 @@ trainer = vf.GRPOTrainer(
 )
 
 trainer.train()
-
