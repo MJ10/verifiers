@@ -328,6 +328,7 @@ class Environment(ABC):
         # run rollouts    
         if isinstance(inputs, Dataset):
             # get prompt column
+            
             results = {col: deepcopy(inputs[col]) for col in inputs.column_names}
         else:
             results = deepcopy(inputs)

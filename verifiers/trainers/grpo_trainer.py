@@ -404,6 +404,12 @@ class GRPOTrainer(Trainer):
         #                      2          5    15  15  16  16  17  17   <- Take the stored generations and use the second slice to compute the loss
         #                                          ...
 
+        print("--------")
+        print(self.generation_batch_size)
+        print(self.num_generations)
+
+        print(self.generation_batch_size // self.num_generations,)
+        print(self.num_iterations * self.gradient_accumulation_steps)
         return RepeatSampler(
             data_source=self.train_dataset, # type: ignore
             mini_repeat_count=self.num_generations,
@@ -1063,7 +1069,7 @@ class GRPOTrainer(Trainer):
                     reward_tensor = torch.tensor(reward_values, device=all_rewards.device)
                 else:
                     reward_tensor = reward_values
-                mean_reward = reward_tensor.mean().item()
+                mean_reward = reward_tensor.float().mean().item()
                 self._metrics[mode][f"rewards/{reward_key}"].append(mean_reward)
 
     def _log_textual_data_primary(

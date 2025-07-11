@@ -39,9 +39,10 @@ training_args.num_generations=12
 training_args.gradient_accumulation_steps=4
 training_args.max_prompt_length=8192
 training_args.max_completion_length=2048
-training_args.max_steps=100
+training_args.max_steps=1000
 training_args.mask_env_responses=True
 training_args.async_generation_timeout=1000
+training_args.num_batches_ahead=0
 
 model, tokenizer = vf.get_model_and_tokenizer(args.model_name)
 
@@ -71,10 +72,9 @@ def get_environment_ids(textworld_games_path, tasks, max_steps, seed=0):
 
 env_ids = get_environment_ids(TEXTWORLD_PATH, tasks, max_steps=10, seed=args.seed)
 # randomly split into train and eval
-train_env_ids = random.sample(env_ids, int(len(env_ids) * 0.8))
+train_env_ids = random.sample(env_ids, int(len(env_ids) * 0.8))[:2]
 eval_env_ids = [env_id for env_id in env_ids if env_id not in train_env_ids]
 
-#ciao moksh
 vf_env = TextWorldEnv(
     programs_dir=args.programs_dir,
     data_dir=args.data_dir,
