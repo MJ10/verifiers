@@ -74,7 +74,7 @@ env_ids = get_environment_ids(TEXTWORLD_PATH, tasks, max_steps=10, seed=args.see
 train_env_ids = random.sample(env_ids, int(len(env_ids) * 0.8))
 eval_env_ids = [env_id for env_id in env_ids if env_id not in train_env_ids]
 
-
+#ciao moksh
 vf_env = TextWorldEnv(
     programs_dir=args.programs_dir,
     data_dir=args.data_dir,
