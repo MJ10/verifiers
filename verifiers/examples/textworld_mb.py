@@ -18,7 +18,7 @@ training:
 CUDA_VISIBLE_DEVICES=4,5,6,7 accelerate launch --config-file configs/zero3.yaml --num-processes 4 verifiers/examples/autumn_mb.py
 """
 
-size = '0.5B'
+size = '7B'
 model_name = f'Qwen/Qwen2.5-{size}-Instruct'
 programs_dir = "programs/"
 data_dir = "data/"
@@ -34,15 +34,16 @@ args = argparser.parse_args()
 run_name = f"autumn-grpo-{args.model_name}"
 training_args=vf.grpo_defaults(run_name=run_name)
 training_args.num_iterations=1
-training_args.per_device_train_batch_size=6
-training_args.num_generations=12
-training_args.gradient_accumulation_steps=4
+training_args.per_device_train_batch_size=1
+training_args.num_generations=1
+training_args.gradient_accumulation_steps=1
 training_args.max_prompt_length=8192
 training_args.max_completion_length=2048
-training_args.max_steps=1000
+training_args.max_steps=1
 training_args.mask_env_responses=True
 training_args.async_generation_timeout=1000
 training_args.num_batches_ahead=0
+training_args.generation_batch_size = 1
 
 model, tokenizer = vf.get_model_and_tokenizer(args.model_name)
 
@@ -72,7 +73,7 @@ def get_environment_ids(textworld_games_path, tasks, max_steps, seed=0):
 
 env_ids = get_environment_ids(TEXTWORLD_PATH, tasks, max_steps=10, seed=args.seed)
 # randomly split into train and eval
-train_env_ids = random.sample(env_ids, int(len(env_ids) * 0.8))[:2]
+train_env_ids = random.sample(env_ids, int(len(env_ids) * 0.8))
 eval_env_ids = [env_id for env_id in env_ids if env_id not in train_env_ids]
 
 vf_env = TextWorldEnv(

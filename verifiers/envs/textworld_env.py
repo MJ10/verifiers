@@ -125,6 +125,8 @@ class TextWorldEnv(MultiTurnEnv):
         rubric.add_reward_func(parser.get_format_reward_func(), weight=0.2)
 
         self.dataset, self.eval_dataset = self.textworld_to_hf(train_list, eval_list)
+        print("Train dataset length:", len(self.dataset))
+        print("Eval dataset length:", len(self.eval_dataset))
         super().__init__(
             system_prompt=SYSTEM_PROMPT,
             parser=parser,
